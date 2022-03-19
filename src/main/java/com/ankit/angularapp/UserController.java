@@ -12,12 +12,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.jms.Queue;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jms.core.JmsTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +38,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = "localhost:4200")
 public class UserController {
 	
 	@Autowired
@@ -61,6 +63,10 @@ public class UserController {
 	private PaymentRepository paymentRepository;
 	@Autowired
 	private UserImageRepository userImageRepository;
+	@Autowired
+	private Queue queue;
+	@Autowired
+    private JmsTemplate jmsTemplate;
 
     @GetMapping("/users")
     public List<User> getUsers() {
@@ -72,10 +78,22 @@ public class UserController {
     void addUser(@RequestBody User user) {
     	System.out.println("save user called");
     	String encodedPwd = bCryptPasswordEncoder.encode(user.getPassword()) ;
+    	String encodedEmail = Base64.encodeBase64String(user.getEmail().getBytes());
+    	String mailUrl="http://localhost:4200/verifyemail/"+encodedEmail;
     	user.setPassword(encodedPwd);
+    	user.setCstatus(0);
     	Set<Hobby> hobbies = user.getHobbies();
     			hobbies.forEach(hobby -> hobby.setUser(user));
     	userRepository.save(user);
+    	MessageConfigBean messageConfigBean = new MessageConfigBean();
+		int recId = Integer.parseInt(user.getId().toString());
+		messageConfigBean.setFromMailId("ankitraj.raj82@gmail.com");
+		messageConfigBean.setRecipientId(recId);
+		messageConfigBean.setRecipientName(user.getName());
+		messageConfigBean.setToMailId(user.getEmail());
+		messageConfigBean.setMailSubject("Hello "+user.getName() +", Welcome To Splitter : ");
+		messageConfigBean.setMailContent("<h1 style=\"color:blue;\">Hello " +user.getName() +"</h1><br><p style=\"color:red;\"> Please Click on The Below Link to Activate Your Account</p><br><a href=\""+mailUrl+"\">Verify Email</a>");
+		jmsTemplate.convertAndSend(queue, messageConfigBean);
     	//hobbyRepository.saveAll(hobbies);
     }
     @GetMapping("/users/{id}")
@@ -499,5 +517,59 @@ public class UserController {
     	}
     	return map;
 	}
+    @GetMapping("/verifyemail/{encodedMailId}")
+    public String verifyEmail(@PathVariable("encodedMailId") String encodedMailId) {
+    	String msg="0";
+    	try {
+    	System.out.println("verify mailId called");
+    	byte[] decodedBytes = Base64.decodeBase64(encodedMailId);
+    	String decodedString = new String(decodedBytes);
+    	User user = userRepository.getStudentByMailId(decodedString);
+    	if(user != null) {
+    		if(user.getCstatus() != 1) {
+    	user.setCstatus(1);
+    	msg="1";  //email verified
+    	userRepository.save(user);
+    		}else {
+    			msg="2"; //email already verified
+    		}
+    	}
+        return msg;
+    	}
+    	catch(Exception e) {
+    		return msg;
+    	}
+    }
     
+    @PostMapping("/resetpassword")
+    public void resetPassword(@RequestParam("emailId") String emailId) {
+    	System.out.println("Reset Password called");
+    	User user = userRepository.getStudentByMailId(emailId);
+    	String encodedEmail = Base64.encodeBase64String(user.getEmail().getBytes());
+    	String mailUrl="http://localhost:4200/resetpassword/"+encodedEmail;
+    	if(user != null) {
+    		MessageConfigBean messageConfigBean = new MessageConfigBean();
+    		int recId = Integer.parseInt(user.getId().toString());
+    		messageConfigBean.setFromMailId("ankitraj.raj82@gmail.com");
+    		messageConfigBean.setRecipientId(recId);
+    		messageConfigBean.setRecipientName(user.getName());
+    		messageConfigBean.setToMailId(user.getEmail());
+    		messageConfigBean.setMailSubject("Hello "+user.getName() +", Reset Splitter Password ");
+    		messageConfigBean.setMailContent("<h1 style=\"color:blue;\">Hello " +user.getName() +"</h1><br><p style=\"color:red;\"> Please Click on The Below Link to Reset Password</p><br><a href=\""+mailUrl+"\">Reset Password</a>");
+    		jmsTemplate.convertAndSend(queue, messageConfigBean);
+    	}
+    	
+    }
+    @PostMapping("/changepassword")
+    void changePassword(@RequestParam("encodedMailId") String encodedMailId,@RequestParam("password") String password) {
+    	System.out.println("change password called");
+    	String encodedPwd = bCryptPasswordEncoder.encode(password) ;
+    	byte[] decodedBytes = Base64.decodeBase64(encodedMailId);
+    	String decodedString = new String(decodedBytes);
+    	User user =userRepository.getStudentByMailId(decodedString);
+    	if(user != null) {
+    		user.setPassword(encodedPwd);
+    		userRepository.save(user);
+    	}
+    }
 }

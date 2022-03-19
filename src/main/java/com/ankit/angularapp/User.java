@@ -43,7 +43,14 @@ public class User implements UserDetails{
 	
 	
 	private int age;
+	private int cstatus;
 	
+	public int getCstatus() {
+		return cstatus;
+	}
+	public void setCstatus(int cstatus) {
+		this.cstatus = cstatus;
+	}
 	@OneToMany(fetch=FetchType.EAGER,cascade=CascadeType.ALL,mappedBy="user")
 	private Set<Hobby> hobbies = new HashSet<Hobby>();
 	
