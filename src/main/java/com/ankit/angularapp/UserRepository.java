@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import com.ankit.angularapp.User;
 
 public interface UserRepository extends JpaRepository<User, Long>{
-	@Query("SELECT u FROM User u WHERE u.email = :email and u.cstatus=1")
+	@Query("SELECT u FROM User u WHERE u.email = :email ")
     public User getStudentByMailId(@Param("email") String email);
 	User findOneByEmail(String email);
 	

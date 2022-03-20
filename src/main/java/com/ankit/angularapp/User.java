@@ -164,7 +164,7 @@ public void setRoles(Set<Role> roles) {
 	@JsonIgnore
 	public boolean isEnabled() {
 		// TODO Auto-generated method stub
-		return true;
+		return this.cstatus==1;
 	}
 	public User(Long id) {
 		this.id=id;
