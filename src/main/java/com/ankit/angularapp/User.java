@@ -44,7 +44,16 @@ public class User implements UserDetails{
 	
 	private int age;
 	private int cstatus;
+	private int isExternal;
 	
+	
+	
+	public int getIsExternal() {
+		return isExternal;
+	}
+	public void setIsExternal(int isExternal) {
+		this.isExternal = isExternal;
+	}
 	public int getCstatus() {
 		return cstatus;
 	}
@@ -115,7 +124,7 @@ public void setRoles(Set<Role> roles) {
 		this.email = email;
 		this.age = age;
 	}
-	public User(Long id, String name, String email, int age, Set<Hobby> hobbies, String password) {
+	public User(Long id, String name, String email, int age, Set<Hobby> hobbies, String password,int isExternal) {
 		super();
 		this.id = id;
 		this.name = name;
@@ -123,6 +132,7 @@ public void setRoles(Set<Role> roles) {
 		this.age = age;
 		this.hobbies = hobbies;
 		this.password=password;
+		this.isExternal=isExternal;
 	}
 	@JsonIgnore
 	public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -152,7 +162,7 @@ public void setRoles(Set<Role> roles) {
 	@JsonIgnore
 	public boolean isAccountNonLocked() {
 		// TODO Auto-generated method stub
-		return true;
+		return this.isExternal == 0;
 	}
 	@Override
 	@JsonIgnore
