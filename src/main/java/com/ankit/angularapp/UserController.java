@@ -38,7 +38,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 @RestController
-@CrossOrigin(origins = "localhost:4200")
+@CrossOrigin(origins = "splitter.ml")
 public class UserController {
 	
 	@Autowired
@@ -67,6 +67,8 @@ public class UserController {
 	private Queue queue;
 	@Autowired
     private JmsTemplate jmsTemplate;
+	@Autowired
+	private MailService mailService;
 
     @GetMapping("/users")
     public List<User> getUsers() {
@@ -76,11 +78,12 @@ public class UserController {
 
     @PostMapping("/saveuser")
     void addUser(@RequestBody User user) {
+    	String mailUrl="";
     	System.out.println("save user called");
     	if(userRepository.getStudentByMailId(user.getEmail()) == null) {
     	String encodedPwd = bCryptPasswordEncoder.encode(user.getPassword()) ;
     	String encodedEmail = Base64.encodeBase64String(user.getEmail().getBytes());
-    	String mailUrl="http://localhost:4200/verifyemail/"+encodedEmail;
+    	mailUrl="http://splitter.ml/verifyemail/"+encodedEmail;
     	user.setPassword(encodedPwd);
     	user.setIsExternal(user.getIsExternal());
     	user.setCstatus(user.getCstatus());
@@ -114,6 +117,10 @@ public class UserController {
 		 * messageConfigBean);
 		 */
     	//hobbyRepository.saveAll(hobbies);
+    	mailService.sendMail("ankitraj.raj82@gmail.com", user.getEmail(), "Hello "+user.getName() +", Welcome To Splitter : ", "<h1 style=\"color:blue;\">Hello "
+    			  +user.getName()
+    			  +"</h1><br><p style=\"color:red;\"> Please Click on The Below Link to Activate Your Account</p><br><a href=\""
+    			  +mailUrl+"\">Verify Email</a>");
     }
     @GetMapping("/users/{id}")
     public User getUserById(@PathVariable("id") Long id) {
@@ -565,17 +572,24 @@ public class UserController {
     	System.out.println("Reset Password called");
     	User user = userRepository.getStudentByMailId(emailId);
     	String encodedEmail = Base64.encodeBase64String(user.getEmail().getBytes());
-    	String mailUrl="http://localhost:4200/resetpassword/"+encodedEmail;
+    	String mailUrl="http://splitter.ml/resetpassword/"+encodedEmail;
     	if(user != null) {
-    		MessageConfigBean messageConfigBean = new MessageConfigBean();
-    		int recId = Integer.parseInt(user.getId().toString());
-    		messageConfigBean.setFromMailId("ankitraj.raj82@gmail.com");
-    		messageConfigBean.setRecipientId(recId);
-    		messageConfigBean.setRecipientName(user.getName());
-    		messageConfigBean.setToMailId(user.getEmail());
-    		messageConfigBean.setMailSubject("Hello "+user.getName() +", Reset Splitter Password ");
-    		messageConfigBean.setMailContent("<h1 style=\"color:blue;\">Hello " +user.getName() +"</h1><br><p style=\"color:red;\"> Please Click on The Below Link to Reset Password</p><br><a href=\""+mailUrl+"\">Reset Password</a>");
-    		jmsTemplate.convertAndSend(queue, messageConfigBean);
+			/*
+			 * MessageConfigBean messageConfigBean = new MessageConfigBean(); int recId =
+			 * Integer.parseInt(user.getId().toString());
+			 * messageConfigBean.setFromMailId("ankitraj.raj82@gmail.com");
+			 * messageConfigBean.setRecipientId(recId);
+			 * messageConfigBean.setRecipientName(user.getName());
+			 * messageConfigBean.setToMailId(user.getEmail());
+			 * messageConfigBean.setMailSubject("Hello "+user.getName()
+			 * +", Reset Splitter Password ");
+			 * messageConfigBean.setMailContent("<h1 style=\"color:blue;\">Hello "
+			 * +user.getName()
+			 * +"</h1><br><p style=\"color:red;\"> Please Click on The Below Link to Reset Password</p><br><a href=\""
+			 * +mailUrl+"\">Reset Password</a>"); jmsTemplate.convertAndSend(queue,
+			 * messageConfigBean);
+			 */
+    		mailService.sendMail("ankitraj.raj82@gmail.com", user.getEmail(), "Hello "+user.getName() +", Reset Splitter Password ", "<h1 style=\"color:blue;\">Hello " +user.getName() +"</h1><br><p style=\"color:red;\"> Please Click on The Below Link to Reset Password</p><br><a href=\""+mailUrl+"\">Reset Password</a>");
     	}
     	
     }

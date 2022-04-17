@@ -34,11 +34,13 @@ public class AngularAppApplication
 		SpringApplication.run(AngularAppApplication.class, args);
 
 	}
+	
 	/*
 	 * @Override protected SpringApplicationBuilder
 	 * configure(SpringApplicationBuilder builder) { return
 	 * builder.sources(AngularAppApplication.class); }
 	 */
+	 
 
 	/*
 	 * @Bean CommandLineRunner init(UserRepository userRepository,HobbyRepository
