@@ -40,7 +40,7 @@ public class MailService {
 
             protected PasswordAuthentication getPasswordAuthentication() {
 
-                return new PasswordAuthentication(fromId, "5secsofmars");
+                return new PasswordAuthentication(fromId, "YOURPASSWORD");
 
             }
 
