@@ -38,7 +38,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 @RestController
-@CrossOrigin(origins = "splitter.ml")
+@CrossOrigin(origins = "localhost:4200")
 public class UserController {
 	
 	@Autowired
@@ -604,5 +604,12 @@ public class UserController {
     		user.setPassword(encodedPwd);
     		userRepository.save(user);
     	}
+    }
+    
+    @GetMapping("/emailExists/{emailId}")
+    public boolean emailExists(@PathVariable("emailId") String emailId) {
+    	System.out.println("emailExists called");
+    	User user = (User) userRepository.getStudentByMailId(emailId);
+    	return user != null;
     }
 }
