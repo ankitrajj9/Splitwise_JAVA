@@ -2,6 +2,7 @@ package com.ankit.angularapp;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -25,8 +26,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import com.ankit.angularapp.Hobby;
 import com.ankit.angularapp.Role;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatTypes;
 
 @Entity
 @Table(name="user")
@@ -41,8 +44,8 @@ public class User implements UserDetails{
 	private String password;
 	
 	
-	
-	private int age;
+	@JsonFormat(shape=JsonFormat.Shape.STRING,pattern="dd/MM/yyyy")
+	private Date dateOfBirth;
 	private int cstatus;
 	private int isExternal;
 	
@@ -95,11 +98,13 @@ public class User implements UserDetails{
 	public void setName(String name) {
 		this.name = name;
 	}
-	public int getAge() {
-		return age;
+	
+	
+	public Date getDateOfBirth() {
+		return dateOfBirth;
 	}
-	public void setAge(int age) {
-		this.age = age;
+	public void setDateOfBirth(Date dateOfBirth) {
+		this.dateOfBirth = dateOfBirth;
 	}
 	@ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinTable(
@@ -118,18 +123,18 @@ public Set<Role> getRoles() {
 public void setRoles(Set<Role> roles) {
 	this.roles = roles;
 } 
-	public User(String name, String email, int age) {
+	public User(String name, String email, Date dateOfBirth) {
 		super();
 		this.name = name;
 		this.email = email;
-		this.age = age;
+		this.dateOfBirth = dateOfBirth;
 	}
-	public User(Long id, String name, String email, int age, Set<Hobby> hobbies, String password,int isExternal) {
+	public User(Long id, String name, String email, Date dateOfBirth, Set<Hobby> hobbies, String password,int isExternal) {
 		super();
 		this.id = id;
 		this.name = name;
 		this.email = email;
-		this.age = age;
+		this.dateOfBirth = dateOfBirth;
 		this.hobbies = hobbies;
 		this.password=password;
 		this.isExternal=isExternal;
@@ -162,7 +167,7 @@ public void setRoles(Set<Role> roles) {
 	@JsonIgnore
 	public boolean isAccountNonLocked() {
 		// TODO Auto-generated method stub
-		return this.isExternal == 0;
+		return true;
 	}
 	@Override
 	@JsonIgnore

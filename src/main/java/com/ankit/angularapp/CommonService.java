@@ -4,6 +4,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -479,6 +482,11 @@ public JsonObject getOverAllLendedAmt(Long userId) {
 	}
 	obj.addProperty("overAllLendedAmt", amount);
 	return obj;
+}
+
+public Date parseDateFromDB(Date dt) throws ParseException {
+	Date parsedDate=new SimpleDateFormat("yyyy-MM-dd").parse(dt.toString().substring(0, 10));
+	return parsedDate;
 }
 	
 }

@@ -3,6 +3,9 @@ package com.ankit.angularapp;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -129,10 +132,12 @@ public class UserController {
         return  user;
     }
     @GetMapping("/getUserByMailId/{emailId}")
-    public User getUserByMailId(@PathVariable("emailId") String emailId) {
+    public User getUserByMailId(@PathVariable("emailId") String emailId) throws ParseException {
     	System.out.println("get by id called");
     	User user = (User) userRepository.getStudentByMailId(emailId);
-        return  user;
+    	Date parsedDate = commonService.parseDateFromDB(user.getDateOfBirth());
+    	user.setDateOfBirth(parsedDate);
+        return user;
     }
     
     @PutMapping("/users")
