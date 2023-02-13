@@ -29,7 +29,34 @@ public class WebSocketController {
 		byte[] decodedBytes = Base64.decodeBase64(message);
     	String decodedString = new String(decodedBytes);
     	User user = (User) userRepository.findById(new Long(decodedString.split("_")[1])).get();
-		this.template.convertAndSend("/chat/"+decodedString.split("_")[0]+"/"+user.getEmail(),new SimpleDateFormat("HH:mm:ss").format(new Date())+"-"+message);
+		this.template.convertAndSend("/settleup/"+decodedString.split("_")[0]+"/"+user.getEmail(),new SimpleDateFormat("HH:mm:ss").format(new Date())+"-"+message);
+	}
+	
+	@MessageMapping("/send/chatmessage")
+	public void onReceivedChatMessage(String message) {
+		System.out.println(message);
+		byte[] decodedBytes = Base64.decodeBase64(message);
+    	String decodedString = new String(decodedBytes);
+    	User user = (User) userRepository.findById(new Long(decodedString.split("_")[1])).get();
+		this.template.convertAndSend("/chat/"+decodedString.split("_")[1]+"/"+decodedString.split("_")[0],new SimpleDateFormat("HH:mm:ss").format(new Date())+"-"+message);
+	}
+	
+	@MessageMapping("/send/chatmessagenotification")
+	public void onReceivedChatMessageNotification(String message) {
+		System.out.println(message);
+		byte[] decodedBytes = Base64.decodeBase64(message);
+    	String decodedString = new String(decodedBytes);
+    	User user = (User) userRepository.findById(new Long(decodedString)).get();
+		this.template.convertAndSend("/chatnotification/"+decodedString,new SimpleDateFormat("HH:mm:ss").format(new Date())+"-"+message);
+	}
+	
+	@MessageMapping("/send/chatdynmsgsend")
+	public void dynamicMessageSend(String message) {
+		System.out.println(message);
+		byte[] decodedBytes = Base64.decodeBase64(message);
+    	String decodedString = new String(decodedBytes);
+    	User user = (User) userRepository.findById(new Long(decodedString)).get();
+		this.template.convertAndSend("/chatrcvdynmsg/"+decodedString,new SimpleDateFormat("HH:mm:ss").format(new Date())+"-"+message);
 	}
 
 }

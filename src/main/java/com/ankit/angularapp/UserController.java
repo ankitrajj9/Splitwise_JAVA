@@ -21,6 +21,9 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jms.core.JmsTemplate;
@@ -35,6 +38,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -76,6 +81,10 @@ public class UserController {
 	private MailService mailService;
 	@Value("${send.external.mail}")
 	private String sendExternalMail;
+	@Autowired
+	private MessageDetailRepository messageDetailRepository;
+	@Autowired
+	private MessageRepository messageRepository;
 
     @GetMapping("/users")
     public List<User> getUsers() {
@@ -174,7 +183,7 @@ public class UserController {
         		map.put("id", user.getId());
         		map.put("name", user.getName());
         		map.put("email", user.getEmail());
-        		map.put("followStatus", userFollowerRepository.userFollows(sessionUser.getId(), user.getId()) != null ? "Following" : "Not Following");
+        		map.put("followStatus", userFollowerRepository.userFollows(sessionUser.getId(), user.getId()) != null ? true : false);
         		UserImage userImage = userImageRepository.getUserImage(user.getId());
         		if(userImage != null) {
         		byte[] imageBytes = commonService.decompressBytes(userImage.getImage());
@@ -625,4 +634,248 @@ public class UserController {
     	User user = (User) userRepository.getStudentByMailId(emailId);
     	return user != null;
     }
+    @PostMapping("/savemessage")
+    public void addMessage(@RequestBody MessageDetail messageDetail) {
+    	System.out.println("SAVE MESSAGE CALLED");
+    	Message message = messageRepository.getMessageBetweenUser(messageDetail.getFromId().getId(), messageDetail.getToId().getId());
+    	if(message == null) {
+    		Message messageAdd = new Message();
+    		messageAdd.setPartyA(messageDetail.getFromId());
+    		messageAdd.setPartyB(messageDetail.getToId());
+    		messageRepository.save(messageAdd);
+    	}
+    	else {
+    		message.setUpdatedOn(new Date());
+    		messageRepository.save(message);
+    	}
+    	if(messageDetail.getContentType() == 2) {
+    		messageDetail.setImage(commonService.compressBytes(messageDetail.getImage()));
+    	}
+    	messageDetail.setIsRead(0);
+    	messageDetailRepository.save(messageDetail);
+    }
+    
+    @PostMapping("/uploadChatImage")
+    public void uploadChatImage(@RequestParam("image") MultipartFile file,@RequestParam("fromId") Long fromId,@RequestParam("toId") Long toId)
+            throws IOException {
+    	MessageDetail messageDetail = new MessageDetail();
+    	messageDetail.setContentType(2);
+    	messageDetail.setFromId(new User(fromId));
+    	messageDetail.setToId(new User(toId));
+    	messageDetail.setIsRead(0);
+    	messageDetail.setImage(commonService.compressBytes(file.getBytes()));
+    	messageDetailRepository.save(messageDetail);
+    }
+    
+    @GetMapping("/getmessages/{userId}")
+    public List<Message> getMessages(@PathVariable("userId") Long userId){
+    	System.out.println("GET MESSAGES CALLED");
+    	List<Message> messages = messageRepository.getMessageForList(userId);
+    	return messages;
+    } 
+    @GetMapping("/getmessagedetail/{userId}/{recipientId}")
+    public List<MessageDetail> getMessageDetails(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId){
+    	System.out.println("GET MESSAGE DETAILS CALLED");
+    	List<MessageDetail> messageDetails = messageDetailRepository.getMessages(userId, recipientId);
+    	for(MessageDetail messageDetail:messageDetails) {
+    		if(messageDetail.getImage() != null) {
+    		messageDetail.setImage(commonService.decompressBytes(messageDetail.getImage()));
+    		}
+    	}
+    	return messageDetails;
+    } 
+    @GetMapping("/getmessagesandimage/{userId}")
+    public Map<String,UserImage> getMessagesAndImage(@PathVariable("userId") Long userId){
+    	List<UserImage> userImages = messageRepository.getMessageUserImage(userId);
+    	Map<String,UserImage> messageUserMap = null;
+    	if(userImages != null && !userImages.isEmpty()) {
+    		messageUserMap = new HashMap<String,UserImage>();
+    		for(UserImage userImage:userImages) {
+    			byte[] imageBytes = commonService.decompressBytes(userImage.getImage());
+    			userImage.setImage(imageBytes);
+    			messageUserMap.put(userImage.getUser().getId().toString(), userImage);
+    		}
+    	}
+    	return messageUserMap;
+    }
+    @GetMapping("/getmessagesbetweenusers/{userId}/{recipientId}")
+    public Message getMessages(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId){
+    	System.out.println("GET MESSAGES BETWEEN USERS CALLED");
+    	Message message = messageRepository.getMessageBetweenUser(userId,recipientId);
+    	return message;
+    } 
+    
+    @GetMapping("/getunreadcount/{userId}")
+    public String getUnreadCount(@PathVariable("userId") Long userId){
+    	System.out.println("GET UNREAD MESSAGES COUNT");
+    	Long unReadCount = messageDetailRepository.getUnreadMessageByUserCount(userId);
+    	return unReadCount.toString();
+    }
+    @PostMapping("/readMessage/{toId}/{fromId}")
+    public void readMessage(@PathVariable("toId") Long toId,@PathVariable("fromId") Long fromId) {
+    	System.out.println("READ MESSAGE CALLED");
+    	List<MessageDetail> messageDetails = messageDetailRepository.getUnReadMessageByUser(toId,fromId);
+    	messageDetails.stream().forEach(
+    			messageDetail -> messageDetail.setIsRead(1)
+    			);
+    	messageDetailRepository.saveAll(messageDetails);
+    }
+    @GetMapping("/getunreadmsgusers/{toId}")
+    public Map<String,String> getUnreadMsgUsers(@PathVariable("toId") Long toId){
+    	System.out.println("GET UNREAD MESSAGES USERS");
+    	List<User> unreadUsers = messageDetailRepository.getUnReadMessageUserList(toId);
+    	Map<String,String> map = new HashMap<String, String>();
+    	unreadUsers.stream().forEach(
+    			user -> map.put(user.getId().toString(), user.getId().toString())
+    			);
+    	return map;
+    }
+    
+    @GetMapping("/getlimitedmessagedetail/{userId}/{recipientId}/{limit}/{offset}")
+    public List<MessageDetail> getMessageDetails(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId,@PathVariable("limit") int limit,@PathVariable("offset") int offset){
+    	System.out.println("GET MESSAGE DETAILS WITH LIMIT AND OFFSET CALLED");
+    	Pageable pageable = PageRequest.of(offset, limit);
+    	List<MessageDetail> messageDetails = messageDetailRepository.getLimitedMessages(userId, recipientId,pageable);
+    	for(MessageDetail messageDetail:messageDetails) {
+    		if(messageDetail.getImage() != null) {
+    		messageDetail.setImage(commonService.decompressBytes(messageDetail.getImage()));
+    		}
+    	}
+    	return messageDetails;
+    }
+    @GetMapping("/getcountmessagedetail/{userId}/{recipientId}")
+    public Long getMessageDetailsCount(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId){
+    	System.out.println("GET MESSAGE DETAILS COUNT CALLED");
+    	Long messageDetailsCount = messageDetailRepository.getMessagesCount(userId,recipientId);
+    	return messageDetailsCount;
+    }
+    
+    @GetMapping("/getmaxmessagedetailid")
+    public Long getMaxMessageDetailId(){
+    	System.out.println("GET MAX MESSAGE DETAIL ID CALLED");
+    	Long maxMsgDtlId = messageDetailRepository.getMaxMessagesDtlId();
+    	return maxMsgDtlId;
+    }
+    
+    @GetMapping("/getinitialmessagedetailid/{userId}/{recipientId}")
+    public Long getInitialMessageDetailId(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId){
+    	System.out.println("GET INITIAL MESSAGE DETAIL ID CALLED");
+    	Long initialMsgDtlId = messageDetailRepository.getInitialMessagesDtlId(userId,recipientId);
+    	return initialMsgDtlId;
+    }
+    
+    @GetMapping("/getstartmessagedetails/{userId}/{recipientId}")
+    public List<MessageDetail> getInitialMessageDetailsBetween(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId){
+    	System.out.println("GET MESSAGE DETAILS BETWEEN CALLED");
+    	List<MessageDetail> messageDetails = messageDetailRepository.getTop10Messages(userId,recipientId);
+    	for(MessageDetail messageDetail:messageDetails) {
+    		if(messageDetail.getImage() != null) {
+    		messageDetail.setImage(commonService.decompressBytes(messageDetail.getImage()));
+    		}
+    	}
+    	return messageDetails;
+    }
+    
+    @GetMapping("/getnextmessagedetails/{userId}/{recipientId}/{lastMaxId}")
+    public List<MessageDetail> getNextMessageDetailsBetween(@PathVariable("userId") Long userId,@PathVariable("recipientId") Long recipientId,@PathVariable("lastMaxId") Long lastMaxId){
+    	System.out.println("GET MESSAGE DETAILS BETWEEN CALLED");
+    	List<MessageDetail> messageDetails = messageDetailRepository.getNext10Messages(userId,recipientId,lastMaxId);
+    	for(MessageDetail messageDetail:messageDetails) {
+    		if(messageDetail.getImage() != null) {
+    		messageDetail.setImage(commonService.decompressBytes(messageDetail.getImage()));
+    		}
+    	}
+    	return messageDetails;
+    }
+    
+    @GetMapping("/getuserwiseunreadcount/{userId}")
+    public String getUserWiseUnreadCount(@PathVariable("userId") Long userId){
+    	System.out.println("GET USER WISE UNREAD COUNT CALLED");
+    	JsonObject unreadData = new JsonObject();
+    	HashSet<Long> userIds = null;
+    	List<Message> lst = messageRepository.getMessageUserList(userId);
+    	if(lst != null && !lst.isEmpty()) {
+    		userIds = new HashSet<Long>();
+    		for(Message message:lst) {
+    			Long partyAId = message.getPartyA().getId();
+    			Long partyBId = message.getPartyB().getId();
+    			if(!partyAId.equals(userId)) {
+    				userIds.add(partyAId);
+    			}
+    			if(!partyBId.equals(userId)) {
+    				userIds.add(partyBId);
+    			}
+    		}
+    	}
+    	if(userIds != null && !userIds.isEmpty()) {
+    		//unreadData = new JsonObject();
+    	for(Long recipientId:userIds) {
+    		Long unreadCount = messageDetailRepository.getUserWiseUnreadCount(userId,recipientId);
+    		if(!unreadCount.equals(new Long(0))) {
+    			unreadData.addProperty(recipientId.toString(), unreadCount);
+    		}
+    	}
+    }
+    	
+    	return unreadData.toString();
+    }
+    
+    @GetMapping("/searchgroups/{searchtext}/{id}")
+    public String searchGroups(@PathVariable("searchtext") String searchText,@PathVariable("id") String fromMailId) {
+    	System.out.println("search gropup called");
+    	User user = userRepository.getStudentByMailId(fromMailId);
+    	List<GroupMaster> groups =groupRepository.searchUserGroups(user.getId(),searchText);
+    	JsonArray jsonArray = new JsonArray();
+    	for(GroupMaster group:groups) {
+    	JsonArray arr = new JsonArray();
+    	JsonObject groupDetail = new JsonObject(); 
+    	groupDetail.addProperty("groupId", group.getGroupId());
+    	groupDetail.addProperty("groupName",group.getGroupName()); 
+    	groupDetail.addProperty("createdOn",group.getCreatedOn().toString()); 
+    	groupDetail.addProperty("totalExpense",group.getTotalExpense()); 
+    	groupDetail.addProperty("totalUsers",group.getTotalUsers()); 
+    	groupDetail.addProperty("createdBy",group.getCreatedBy());
+    	arr.add(groupDetail);
+    	arr.add(commonService.getTotalBorrowedAmt(group.getGroupId(), userRepository.getStudentByMailId(fromMailId).getId()));
+    	arr.add(commonService.getTotalLendedAmt(group.getGroupId(), userRepository.getStudentByMailId(fromMailId).getId()));
+    	jsonArray.add(arr);
+    	}
+        return jsonArray.toString();
+    }
+    
+    @GetMapping("/searchsortgroups/{searchtext}/{sortVal}/{id}")
+    public String searchSortGroups(@PathVariable("searchtext") String searchText,@PathVariable("sortVal") int sortVal,@PathVariable("id") String fromMailId) {
+    	System.out.println("search and sort gropup called");
+    	User user = userRepository.getStudentByMailId(fromMailId);
+    	//String sortValue = sortVal == 1 ? "groupMaster.groupName ASC" : sortVal == 2 ? "groupMaster.groupName DESC" : sortVal == 3 ? "groupMaster.createdOn ASC" : "groupMaster.groupName DESC";
+    	searchText = searchText.equalsIgnoreCase("ALL") ? "" : searchText;
+    	List<GroupMaster> groups = null;
+    	if(sortVal == 1) {
+    		groups =groupRepository.searchSortUserGroupsAZ(user.getId(),searchText);
+    	}else if(sortVal == 2) {
+    		groups =groupRepository.searchSortUserGroupsZA(user.getId(),searchText);
+    	}else if(sortVal == 3) {
+    		groups =groupRepository.searchSortUserGroupsCreatedOnASC(user.getId(),searchText);
+    	}else if(sortVal == 4) {
+    		groups =groupRepository.searchSortUserGroupsCreatedOnDESC(user.getId(),searchText);
+    	}
+    	
+    	JsonArray jsonArray = new JsonArray();
+    	for(GroupMaster group:groups) {
+    	JsonArray arr = new JsonArray();
+    	JsonObject groupDetail = new JsonObject(); 
+    	groupDetail.addProperty("groupId", group.getGroupId());
+    	groupDetail.addProperty("groupName",group.getGroupName()); 
+    	groupDetail.addProperty("createdOn",group.getCreatedOn().toString()); 
+    	groupDetail.addProperty("totalExpense",group.getTotalExpense()); 
+    	groupDetail.addProperty("totalUsers",group.getTotalUsers()); 
+    	groupDetail.addProperty("createdBy",group.getCreatedBy());
+    	arr.add(groupDetail);
+    	arr.add(commonService.getTotalBorrowedAmt(group.getGroupId(), userRepository.getStudentByMailId(fromMailId).getId()));
+    	arr.add(commonService.getTotalLendedAmt(group.getGroupId(), userRepository.getStudentByMailId(fromMailId).getId()));
+    	jsonArray.add(arr);
+    	}
+        return jsonArray.toString();
+    }
+    
 }

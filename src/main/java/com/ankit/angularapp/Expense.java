@@ -16,6 +16,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 @Entity
 @Table(name="expense")
 public class Expense {
@@ -24,9 +26,13 @@ public class Expense {
 	private Long expenseId;
 	private String description;
 	private BigDecimal amount;
+	
+	@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 	@ManyToOne(fetch=FetchType.LAZY)
 	@JoinColumn(name="groupId")
 	private GroupMaster groupMaster;
+	
+	@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 	@ManyToOne(fetch=FetchType.LAZY)
 	@JoinColumn(name="id")
 	private User user;
